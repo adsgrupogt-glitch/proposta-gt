@@ -725,42 +725,42 @@ function Dashboard({me, isAdmin, props, oss=[], contratos=[], saveProps, users})
   const perdidas = base.filter(p=>p.status==="Perdida");
   const abertas = base.filter(p=>p.status==="Rascunho"||p.status==="Enviada");
   const mrr = fechadas.reduce((s,p)=>s+p.valorMensalTotal,0);
-  const pipeline = abertas.reduce((s,p)=>s+p.valorGlobal,0);
+  const pipeline = abertas.reduce((s,p)=>s+p.valorMensalTotal,0);   // mensal (abertas)
   const globalFechado = fechadas.reduce((s,p)=>s+p.valorGlobal,0);
   const decididas = fechadas.length+perdidas.length;
   const conv = decididas? fechadas.length/decididas*100 : 0;
-  const ticket = fechadas.length? globalFechado/fechadas.length : 0;
+  const ticket = fechadas.length? mrr/fechadas.length : 0;          // ticket médio MENSAL
   const valorContratado = contratos.reduce((s,c)=>s+(c.valorMensal||0),0);
 
   // Funil comercial
   const stCount=(st)=>base.filter(p=>p.status===st);
-  const sumG=(arr)=>arr.reduce((s,p)=>s+p.valorGlobal,0);
+  const sumM=(arr)=>arr.reduce((s,p)=>s+p.valorMensalTotal,0);
   const stages=[
-    {label:"Rascunho", count:stCount("Rascunho").length, value:sumG(stCount("Rascunho")), color:C.gray},
-    {label:"Enviada", count:stCount("Enviada").length, value:sumG(stCount("Enviada")), color:C.teal},
-    {label:"Fechada", count:fechadas.length, value:globalFechado, color:C.navy},
+    {label:"Rascunho", count:stCount("Rascunho").length, value:sumM(stCount("Rascunho")), color:C.gray},
+    {label:"Enviada", count:stCount("Enviada").length, value:sumM(stCount("Enviada")), color:C.teal},
+    {label:"Fechada", count:fechadas.length, value:mrr, color:C.navy},
   ];
 
   // Evolução mensal
   const meses = useMemo(()=> ultimosMeses(periodo==="ano"? (new Date().getMonth()+1) : 12), [periodo]);
   const serie = meses.map(mn=>{ const doMes=base.filter(p=>(p.criadoEm||"").slice(0,7)===mn.key);
     const fMes=doMes.filter(p=>p.status==="Fechada");
-    return { label:mn.label, criadas:doMes.length, fechado:fMes.reduce((s,p)=>s+p.valorGlobal,0), mrr:fMes.reduce((s,p)=>s+p.valorMensalTotal,0) }; });
+    return { label:mn.label, criadas:doMes.length, fechado:fMes.reduce((s,p)=>s+p.valorMensalTotal,0), mrr:fMes.reduce((s,p)=>s+p.valorMensalTotal,0) }; });
 
   // Ranking consultores
   const ranking = useMemo(()=>{ const m={};
     base.forEach(p=>{ const k=p.consultorNome||"—"; (m[k]=m[k]||{nome:k,total:0,fechadas:0,perdidas:0,global:0,mrr:0});
       const o=m[k]; o.total++; if(p.status==="Fechada"){o.fechadas++; o.global+=p.valorGlobal; o.mrr+=p.valorMensalTotal;} if(p.status==="Perdida") o.perdidas++; });
-    return Object.values(m).map(o=>({...o, conv:(o.fechadas+o.perdidas)?o.fechadas/(o.fechadas+o.perdidas)*100:0})).sort((a,b)=>b.global-a.global);
+    return Object.values(m).map(o=>({...o, conv:(o.fechadas+o.perdidas)?o.fechadas/(o.fechadas+o.perdidas)*100:0})).sort((a,b)=>b.mrr-a.mrr);
   },[base]);
-  const maxGlobalRank = Math.max(...ranking.map(r=>r.global),1);
+  const maxMrrRank = Math.max(...ranking.map(r=>r.mrr),1);
 
   // Mix
   const segMix=[["asseio","Asseio"],["vigilancia","Vigilância"],["misto","Misto"]]
-    .map(([k,l])=>({name:l, value:fechadas.filter(p=>(p.segmento||"")===k).reduce((s,p)=>s+p.valorGlobal,0)})).filter(d=>d.value>0);
+    .map(([k,l])=>({name:l, value:fechadas.filter(p=>(p.segmento||"")===k).reduce((s,p)=>s+p.valorMensalTotal,0)})).filter(d=>d.value>0);
   const segColors=[C.navy,C.teal,C.gray];
   const regMix=[["FPOLIS","Florianópolis"],["BC","Litoral Norte"]]
-    .map(([k,l])=>({name:l, value:fechadas.filter(p=>p.regiao===k).reduce((s,p)=>s+p.valorGlobal,0)})).filter(d=>d.value>0);
+    .map(([k,l])=>({name:l, value:fechadas.filter(p=>p.regiao===k).reduce((s,p)=>s+p.valorMensalTotal,0)})).filter(d=>d.value>0);
   const regColors=[C.navy,C.teal];
 
   // Funil de execução (operações)
@@ -781,7 +781,7 @@ function Dashboard({me, isAdmin, props, oss=[], contratos=[], saveProps, users})
 
   return (
     <div>
-      <Header title="Dashboard" sub={"Visão executiva do comercial"+(tipo==="extras"?" · Propostas Extras":tipo==="normais"?" · Propostas Normais":" · todas as propostas")}
+      <Header title="Dashboard" sub={"Visão executiva do comercial · valores mensais"+(tipo==="extras"?" · Propostas Extras":tipo==="normais"?" · Propostas Normais":"")}
         right={<div className="flex gap-2 flex-wrap">
           <div className="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">{tabBtn("12m","12 meses")}{tabBtn("ano",anoAtual)}{tabBtn("tudo","Tudo")}</div>
           <div className="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
@@ -792,13 +792,13 @@ function Dashboard({me, isAdmin, props, oss=[], contratos=[], saveProps, users})
           </div>}
         </div>}/>
 
-      {/* KPIs principais */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
+      {/* KPIs principais — 3 em cima, 3 embaixo, todos em base MENSAL */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
         <Kpi label="Carteira recorrente (MRR)" value={BRL(mrr)} icon={Wallet} tone={C.mint}/>
-        <Kpi label="Pipeline em aberto" value={BRL(pipeline)} icon={Clock} tone="#E7F0F5"/>
-        <Kpi label="Global fechado" value={BRL(globalFechado)} icon={BarChart3} tone={C.mint}/>
+        <Kpi label="Pipeline em aberto (mensal)" value={BRL(pipeline)} icon={Clock} tone="#E7F0F5"/>
+        <Kpi label="Ticket médio mensal" value={BRL(ticket)} icon={FileText} tone={C.mint}/>
         <Kpi label="Taxa de fechamento" value={conv.toFixed(0)+"%"} icon={ShieldCheck} tone="#E7F0F5"/>
-        <Kpi label="Ticket médio (global)" value={BRL(ticket)} icon={FileText} tone={C.mint}/>
+        <Kpi label="Propostas no período" value={base.length} icon={BarChart3} tone={C.mint}/>
         <Kpi label="Contratos · mensal" value={contratos.length+" · "+BRL(valorContratado)} icon={FileSignature} tone="#E7F0F5"/>
       </div>
 
@@ -806,18 +806,18 @@ function Dashboard({me, isAdmin, props, oss=[], contratos=[], saveProps, users})
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <Card className="p-4">
           <div className="text-sm font-semibold text-slate-700 mb-1">Funil comercial</div>
-          <div className="text-[11px] text-slate-400 mb-3">Propostas por etapa (qtd · valor global). {perdidas.length>0 && <>Perdidas no período: <b>{perdidas.length}</b> ({BRL(sumG(perdidas))}).</>}</div>
+          <div className="text-[11px] text-slate-400 mb-3">Propostas por etapa (qtd · valor mensal). {perdidas.length>0 && <>Perdidas no período: <b>{perdidas.length}</b> ({BRL(sumM(perdidas))}).</>}</div>
           <Funil stages={stages}/>
         </Card>
         <Card className="p-4">
           <div className="text-sm font-semibold text-slate-700 mb-1">Carteira por segmento</div>
-          <div className="text-[11px] text-slate-400 mb-2">Global fechado · Asseio × Vigilância</div>
+          <div className="text-[11px] text-slate-400 mb-2">Mensal fechado · Asseio × Vigilância</div>
           <Donut data={segMix} colors={segColors} height={170}/>
           <LegendaVals data={segMix} colors={segColors}/>
         </Card>
         <Card className="p-4">
           <div className="text-sm font-semibold text-slate-700 mb-1">Carteira por região</div>
-          <div className="text-[11px] text-slate-400 mb-2">Global fechado · Florianópolis × BC</div>
+          <div className="text-[11px] text-slate-400 mb-2">Mensal fechado · Florianópolis × Litoral Norte</div>
           <Donut data={regMix} colors={regColors} height={170}/>
           <LegendaVals data={regMix} colors={regColors}/>
         </Card>
@@ -826,11 +826,11 @@ function Dashboard({me, isAdmin, props, oss=[], contratos=[], saveProps, users})
       {/* Evolução mensal */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <Card className="p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-3">Valor fechado por mês</div>
+          <div className="text-sm font-semibold text-slate-700 mb-3">Recorrência fechada por mês (mensal)</div>
           <div style={{height:230}}><ResponsiveContainer><BarChart data={serie}>
             <CartesianGrid strokeDasharray="3 3" stroke="#eef2f4"/><XAxis dataKey="label" tick={{fontSize:11}}/>
             <YAxis tickFormatter={v=>"R$"+(v/1000).toFixed(0)+"k"} tick={{fontSize:11}}/>
-            <Tooltip formatter={(v,n)=>[BRL(v), n==="fechado"?"Global fechado":"MRR"]}/>
+            <Tooltip formatter={(v)=>[BRL(v), "Mensal fechado"]}/>
             <Bar dataKey="fechado" radius={[6,6,0,0]} fill={C.navy}/>
           </BarChart></ResponsiveContainer></div>
         </Card>
@@ -861,19 +861,17 @@ function Dashboard({me, isAdmin, props, oss=[], contratos=[], saveProps, users})
             <th className="text-center py-2 font-medium">Propostas</th>
             <th className="text-center py-2 font-medium">Fechadas</th>
             <th className="text-center py-2 font-medium">Conversão</th>
-            <th className="text-right py-2 font-medium">MRR fechado</th>
-            <th className="text-right py-2 font-medium pl-3">Global fechado</th>
+            <th className="text-right py-2 font-medium pl-3">MRR fechado (mensal)</th>
           </tr></thead>
           <tbody>{ranking.map((r,i)=><tr key={i} className="border-t border-slate-50">
             <td className="py-2.5 font-medium text-slate-700">{r.nome}</td>
             <td className="py-2.5 text-center text-slate-500">{r.total}</td>
             <td className="py-2.5 text-center text-slate-500">{r.fechadas}</td>
             <td className="py-2.5 text-center"><span className="text-xs font-semibold" style={{color:r.conv>=50?C.navy:C.gray}}>{r.conv.toFixed(0)}%</span></td>
-            <td className="py-2.5 text-right text-slate-600">{BRL(r.mrr)}</td>
             <td className="py-2.5 pl-3">
               <div className="flex items-center justify-end gap-2">
-                <div className="hidden sm:block w-24 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full" style={{width:(r.global/maxGlobalRank*100)+"%", backgroundColor:C.navy}}/></div>
-                <span className="font-semibold text-slate-800 w-28 text-right">{BRL(r.global)}</span>
+                <div className="hidden sm:block w-24 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full" style={{width:(r.mrr/maxMrrRank*100)+"%", backgroundColor:C.navy}}/></div>
+                <span className="font-semibold text-slate-800 w-28 text-right">{BRL(r.mrr)}</span>
               </div>
             </td>
           </tr>)}</tbody>
