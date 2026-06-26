@@ -144,7 +144,8 @@ const EXTRA_ADMLUCRO = { FPOLIS:[0.09,0.09], BC:[0.10,0.10] };
 const empresaDefaultDe = (tab)=> /^vigilante\s+12x36\s+(d|n)\b/i.test((tab||"").trim()) ? "emp02" : "emp01";
 const empById = (empresas, id)=> (empresas||[]).find(e=>e.id===id) || (empresas&&empresas[0]) || null;
 const empLabel = (e)=> e ? (e.fantasia || e.razaoSocial || "Empresa") : "—";
-const CIDADE_REG = { FPOLIS:"Florianópolis/ SC", BC:"Balneário Camboriú/ SC" };
+const CIDADE_REG = { FPOLIS:"Florianópolis/ SC", BC:"Litoral Norte/ SC" };
+const REG_TAB = { FPOLIS:"Grande Fpolis", BC:"Litoral Norte" };   // rótulo da tabela escolhida (Região)
 const CATEGORIA = (tab)=>{ const w=(tab||"").split(" ")[0];
   return ({Portaria:"Porteiro", Recepção:"Recepcionista", Vigia:"Vigilante"})[w] || w; };
 
@@ -758,7 +759,7 @@ function Dashboard({me, isAdmin, props, oss=[], contratos=[], saveProps, users})
   const segMix=[["asseio","Asseio"],["vigilancia","Vigilância"],["misto","Misto"]]
     .map(([k,l])=>({name:l, value:fechadas.filter(p=>(p.segmento||"")===k).reduce((s,p)=>s+p.valorGlobal,0)})).filter(d=>d.value>0);
   const segColors=[C.navy,C.teal,C.gray];
-  const regMix=[["FPOLIS","Florianópolis"],["BC","Balneário Camboriú"]]
+  const regMix=[["FPOLIS","Florianópolis"],["BC","Litoral Norte"]]
     .map(([k,l])=>({name:l, value:fechadas.filter(p=>p.regiao===k).reduce((s,p)=>s+p.valorGlobal,0)})).filter(d=>d.value>0);
   const regColors=[C.navy,C.teal];
 
@@ -1022,7 +1023,7 @@ function Sindicatos({sind, saveSind, isAdmin, me, props=[], empresas=[]}){
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
-          {["FPOLIS","BC"].map(r=><button key={r} onClick={()=>setReg(r)} className={`px-3 py-1.5 rounded-md text-sm font-medium ${reg===r?"text-white":"text-slate-600"}`} style={reg===r?{backgroundColor:C.navy}:{}}>{r==="FPOLIS"?"Grande Fpolis":"Balneário Camboriú"}</button>)}
+          {["FPOLIS","BC"].map(r=><button key={r} onClick={()=>setReg(r)} className={`px-3 py-1.5 rounded-md text-sm font-medium ${reg===r?"text-white":"text-slate-600"}`} style={reg===r?{backgroundColor:C.navy}:{}}>{r==="FPOLIS"?"Grande Fpolis":"Litoral Norte"}</button>)}
         </div>
         <div className="flex items-center gap-2 text-sm">
           <History size={16} className="text-slate-400"/>
@@ -1588,7 +1589,7 @@ function PropEditor({me, sind, uniformes, empresas, cndEmpresa, propEdit, client
   const ring=()=> inputCls;
 
   return <div>
-    <Header title={propEdit?`Alterar proposta ${propEdit.numero}${isExtra?" · Extra":""}`:(isExtra?"Nova proposta Extra":"Nova proposta")} sub={`${isExtra?"Base Quadro V "+(regiao==="FPOLIS"?"9%/9%":"10%/10%")+" · ":""}${segmentos.length>1?"Multi-segmento (Asseio + Vigilância)":SEGNOME[segAtual]} · ${regiao==="FPOLIS"?"Florianópolis":"Balneário Camboriú"} · consultor ${me.nome.split(" ")[0]}`}
+    <Header title={propEdit?`Alterar proposta ${propEdit.numero}${isExtra?" · Extra":""}`:(isExtra?"Nova proposta Extra":"Nova proposta")} sub={`${isExtra?"Base Quadro V "+(regiao==="FPOLIS"?"9%/9%":"10%/10%")+" · ":""}${segmentos.length>1?"Multi-segmento (Asseio + Vigilância)":SEGNOME[segAtual]} · ${regiao==="FPOLIS"?"Florianópolis":"Litoral Norte"} · consultor ${me.nome.split(" ")[0]}`}
       right={<div className="flex gap-2"><Btn variant="ghost" onClick={onCancel}>Cancelar</Btn><Btn onClick={salvar} disabled={!podeSalvar}><Save size={16}/>{propEdit?"Salvar alterações":"Gerar e salvar"}</Btn></div>}/>
 
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1603,7 +1604,7 @@ function PropEditor({me, sind, uniformes, empresas, cndEmpresa, propEdit, client
               </div></Field></div>
             <Field label="Região / tabela">
               <select value={regiao} onChange={e=>{setRegiao(e.target.value);setItens([]);}} className={inputCls}>
-                <option value="FPOLIS">Grande Fpolis</option><option value="BC">Balneário Camboriú</option></select></Field>
+                <option value="FPOLIS">Grande Fpolis</option><option value="BC">Litoral Norte</option></select></Field>
           </div>
           {erroCnpj && <div className="text-xs text-amber-600 mt-2">{erroCnpj}</div>}
           <div className="grid grid-cols-1 gap-3 mt-3">
@@ -1630,7 +1631,7 @@ function PropEditor({me, sind, uniformes, empresas, cndEmpresa, propEdit, client
             </div>
           </div>
           <div className="text-[11px] text-slate-400 mb-3 inline-flex items-center gap-1 flex-wrap"><FileCheck2 size={13}/>As CND's são puxadas pela empresa de cada cargo. Empresas: {prestadoras.length?prestadoras.map(p=>p.fantasia||p.razaoSocial).join(" + "):"—"} · CND's anexadas: {cndGrupos.length?cndGrupos.map(g=>CND_GRUPOS[g]).join(" + "):"—"}</div>
-          {semFuncoesAtual && <div className="text-sm text-slate-600 bg-amber-50 border border-amber-100 rounded-lg px-4 py-3">O segmento <b>{SEGNOME[segAtual]}</b> ainda não tem funções cadastradas para {regiao==="FPOLIS"?"Florianópolis":"Balneário Camboriú"}. Cadastre as tabelas em <b>Sindicatos → {SEGNOME[segAtual]}</b> para adicionar funções deste segmento.</div>}
+          {semFuncoesAtual && <div className="text-sm text-slate-600 bg-amber-50 border border-amber-100 rounded-lg px-4 py-3">O segmento <b>{SEGNOME[segAtual]}</b> ainda não tem funções cadastradas para {regiao==="FPOLIS"?"Florianópolis":"Litoral Norte"}. Cadastre as tabelas em <b>Sindicatos → {SEGNOME[segAtual]}</b> para adicionar funções deste segmento.</div>}
           {itens.length===0 && <Empty texto="Adicione as funções conforme a necessidade do condomínio."/>}
           <div className="space-y-2">
             {itens.map((it,i)=>{ const linha=calculo.linhas[i]; const servASG=ehServenteOuAsg(it.tab); const fs=funcoesOf(it.segmento);
@@ -1850,6 +1851,21 @@ function PropView({prop, empresas, onVoltar, onStatus, onEditar, onExcluir, onSo
         if(ehPdf){
           try{
             const apDoc = await PDFDocument.load(dataURLparaBytes(apres.data), { ignoreEncryption:true });
+            // Carimba a Razão Social da proposta na 1ª página, abaixo de "PROPOSTA COMERCIAL", centralizada e menor que o título
+            try{
+              const razao = (prop.razaoSocial||"").trim().toUpperCase();
+              const pgs = apDoc.getPages();
+              if(razao && pgs.length){
+                const { StandardFonts, rgb } = window.PDFLib;
+                const pg = pgs[0]; const { width, height } = pg.getSize();
+                const fb = await apDoc.embedFont(StandardFonts.HelveticaBold);
+                const limpa = razao.replace(/[^\x20-\x7EÀ-ÿ]/g,""); // mantém acentos Latin-1
+                let sz = 22, maxW = width - 90;
+                let tw = fb.widthOfTextAtSize(limpa, sz);
+                while(tw > maxW && sz > 9){ sz -= 1; tw = fb.widthOfTextAtSize(limpa, sz); }
+                pg.drawText(limpa, { x:(width - tw)/2, y: height*0.485, size:sz, font:fb, color: rgb(1,1,1) });
+              }
+            }catch(_){ /* se não puder carimbar, anexa a apresentação como está */ }
             (await out.copyPages(apDoc, apDoc.getPageIndices())).forEach(p=>out.addPage(p));
           }catch(err){ avisos.push("apresentação não pôde ser anexada"); }
         } else { avisos.push("apresentação não é PDF (não embutível)"); }
@@ -2000,7 +2016,7 @@ function PlanilhaCusto({it, prop, totalProf}){
           <tbody>
             {SUB("Mão de Obra Vinculada à Execução Contratual")}
             <tr><td className="px-2 py-[2px] border border-slate-200 w-6 text-center font-semibold">A</td><td className="px-2 py-[2px] border border-slate-200">Tipo de Serviço</td><td className="px-2 py-[2px] border border-slate-200 text-right w-48">{it.tab}</td></tr>
-            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">B</td><td className="px-2 py-[2px] border border-slate-200">Local de Prestação dos Serviços</td><td className="px-2 py-[2px] border border-slate-200 text-right">{prop.endereco||CIDADE_REG[regiao]}</td></tr>
+            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">B</td><td className="px-2 py-[2px] border border-slate-200">Local de Prestação dos Serviços</td><td className="px-2 py-[2px] border border-slate-200 text-right">{REG_TAB[regiao]||regiao}</td></tr>
             <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">C</td><td className="px-2 py-[2px] border border-slate-200">Salário Normativo da Categoria</td><td className="px-2 py-[2px] border border-slate-200 text-right">{BRL(c.normativo)}</td></tr>
             <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">D</td><td className="px-2 py-[2px] border border-slate-200">Categoria Profissional</td><td className="px-2 py-[2px] border border-slate-200 text-right">{CATEGORIA(it.tab)}</td></tr>
             <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">E</td><td className="px-2 py-[2px] border border-slate-200">Quantidade (total) de postos a contratar</td><td className="px-2 py-[2px] border border-slate-200 text-right">{qtd}</td></tr>
@@ -2445,7 +2461,7 @@ function OrdensServico({me, isAdmin, props, oss, saveOss, users}){
         <div className="space-y-2">
           {ganhos.map(p=> <Card key={p.id} className="p-4 flex items-center justify-between">
             <div><div className="font-medium text-slate-800">{p.razaoSocial}</div>
-              <div className="text-xs text-slate-500">{p.numero} · {p.regiao==="FPOLIS"?"Florianópolis":"Balneário Camboriú"} · {BRL(p.valorGlobal)} · {p.itens.length} posto(s)</div></div>
+              <div className="text-xs text-slate-500">{p.numero} · {p.regiao==="FPOLIS"?"Florianópolis":"Litoral Norte"} · {BRL(p.valorGlobal)} · {p.itens.length} posto(s)</div></div>
             <Btn onClick={()=>criar(p)}><Plus size={16}/>Gerar OS</Btn>
           </Card>)}
         </div>}
@@ -2851,7 +2867,7 @@ function Relatorios({me, isAdmin, props, oss=[], contratos=[], users}){
   }),[contratos,oss,scope,periodo,tipo,seg,reg,cons,busca,propById,me.id,me.nome]);
 
   const segNome=(s)=> s==="vigilancia"?"Vigilância":s==="misto"?"Misto":"Asseio";
-  const regNome=(r)=> r==="BC"?"Balneário Camboriú":r==="FPOLIS"?"Florianópolis":r||"—";
+  const regNome=(r)=> r==="BC"?"Litoral Norte":r==="FPOLIS"?"Florianópolis":r||"—";
 
   const fechadas=fProp.filter(p=>p.status==="Fechada");
   const ABAS=[["propostas","Propostas"],["os","Ordens de Serviço"],["contratos","Contratos"],["consultores","Consultores"],["carteira","Carteira por cliente"]];
@@ -2929,7 +2945,7 @@ function Relatorios({me, isAdmin, props, oss=[], contratos=[], users}){
       <select value={seg} onChange={e=>setSeg(e.target.value)} className="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
         <option value="todos">Todos os segmentos</option><option value="asseio">Asseio</option><option value="vigilancia">Vigilância</option><option value="misto">Misto</option></select>
       <select value={reg} onChange={e=>setReg(e.target.value)} className="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
-        <option value="todos">Todas as regiões</option><option value="FPOLIS">Florianópolis</option><option value="BC">Balneário Camboriú</option></select>
+        <option value="todos">Todas as regiões</option><option value="FPOLIS">Florianópolis</option><option value="BC">Litoral Norte</option></select>
       {isAdmin && <select value={cons} onChange={e=>setCons(e.target.value)} className="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
         <option value="todos">Todos os consultores</option>{consultores.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}</select>}
       <div className="relative"><Search size={15} className="absolute left-2.5 top-2.5 text-slate-400"/>
