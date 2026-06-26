@@ -1835,84 +1835,74 @@ function PropView({prop, empresas, onVoltar, onStatus, onEditar, onExcluir, onSo
     const nome=`${prop.numero} - ${prop.razaoSocial}`;
     const gruposCND = (prop.cndGrupos && prop.cndGrupos.length) ? [...new Set(prop.cndGrupos)] : [prop.cndVinculo || prop.segmento || "asseio"];
     const nomesGrupos = gruposCND.map(g=>CND_GRUPOS[g]).join(" + ");
-    // 1) Caminho ideal: rasteriza CADA folha como exatamente 1 página A4.
-    //    Garante as 3 páginas fixas por cargo e elimina a quebra indevida — cargos com mais
-    //    rubricas apenas encolhem proporcionalmente para caber, sem empurrar quadros adiante.
+    // 1) Caminho ideal: PDF real via html2pdf (mantém a Proposta Comercial + planilhas em tamanho legível).
+    //    Os cargos com mais rubricas já vêm com a fonte ajustada (densCls) para caber em 1 página por folha.
     try{
-      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
+      if(!window.html2pdf) throw new Error("html2pdf indisponível");
+      const opt={ margin:[8,8,10,8], image:{type:"jpeg",quality:0.97},
+        html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},
+        jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}, pagebreak:{mode:["css","legacy"], before:".folha", avoid:".quadro"} };
+      if(!incluirApres){
+        await window.html2pdf().set({...opt, filename:nome+".pdf"}).from(el).save();
+        setPdfMsg("PDF salvo nos downloads."); setTimeout(()=>setPdfMsg(""),5000); setPdfBusy(false); return;
+      }
       await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js");
-      if(!window.html2canvas || !window.PDFLib) throw new Error("libs indisponíveis");
+      const apres = await sgetS(K.apres(prop.consultorId));
+      setPdfMsg("Renderizando proposta e planilhas…");
+      const planilhaBytes = await window.html2pdf().set(opt).from(el).outputPdf("arraybuffer");
       const { PDFDocument } = window.PDFLib;
       const out = await PDFDocument.create();
-      const A4=[595.28,841.89], M=18, aw=A4[0]-M*2, ah=A4[1]-M*2;
       let avisos=[];
-
       // 1o Apresentacao (PDF) com a Razao Social carimbada na 1a pagina
-      if(incluirApres){
-        const apres = await sgetS(K.apres(prop.consultorId));
-        if(apres?.data){
-          const ehPdf = (apres.tipo==="application/pdf") || /^data:application\/pdf/.test(apres.data) || /\.pdf$/i.test(apres.nome||"");
-          if(ehPdf){
+      if(apres?.data){
+        const ehPdf = (apres.tipo==="application/pdf") || /^data:application\/pdf/.test(apres.data) || /\.pdf$/i.test(apres.nome||"");
+        if(ehPdf){
+          try{
+            const apDoc = await PDFDocument.load(dataURLparaBytes(apres.data), { ignoreEncryption:true });
             try{
-              const apDoc = await PDFDocument.load(dataURLparaBytes(apres.data), { ignoreEncryption:true });
-              try{
-                const razao = (prop.razaoSocial||"").trim().toUpperCase();
-                const pgs = apDoc.getPages();
-                if(razao && pgs.length){
-                  const { StandardFonts, rgb } = window.PDFLib;
-                  const pg = pgs[0]; const { width, height } = pg.getSize();
-                  const fb = await apDoc.embedFont(StandardFonts.HelveticaBold);
-                  const limpa = razao.replace(/[^\x20-\x7EÀ-ÿ]/g,"");
-                  let sz = 22, maxW = width - 90, tw = fb.widthOfTextAtSize(limpa, sz);
-                  while(tw > maxW && sz > 9){ sz -= 1; tw = fb.widthOfTextAtSize(limpa, sz); }
-                  pg.drawText(limpa, { x:(width - tw)/2, y: height*0.485, size:sz, font:fb, color: rgb(1,1,1) });
-                }
-              }catch(_){}
-              (await out.copyPages(apDoc, apDoc.getPageIndices())).forEach(p=>out.addPage(p));
-            }catch(err){ avisos.push("apresentação não pôde ser anexada"); }
-          } else { avisos.push("apresentação não é PDF (não embutível)"); }
-        } else { avisos.push("nenhuma apresentação cadastrada para o consultor"); }
-      }
-
-      // 2o Proposta + Planilhas: CADA folha vira exatamente 1 pagina A4 (encaixe por escala)
-      const folhas = Array.from(el.querySelectorAll(".folha"));
-      const alvo = folhas.length ? folhas : [el];
-      for(let k=0;k<alvo.length;k++){
-        setPdfMsg(`Renderizando página ${k+1} de ${alvo.length}…`);
-        const canvas = await window.html2canvas(alvo[k], { scale:2, backgroundColor:"#ffffff", useCORS:true, logging:false });
-        const img = await out.embedJpg(dataURLparaBytes(canvas.toDataURL("image/jpeg",0.95)));
-        const sc = Math.min(aw/img.width, ah/img.height);
-        const w=img.width*sc, h=img.height*sc;
-        const page = out.addPage(A4);
-        page.drawImage(img, { x:(A4[0]-w)/2, y:A4[1]-M-h, width:w, height:h });
-      }
-
+              const razao = (prop.razaoSocial||"").trim().toUpperCase();
+              const pgs = apDoc.getPages();
+              if(razao && pgs.length){
+                const { StandardFonts, rgb } = window.PDFLib;
+                const pg = pgs[0]; const { width, height } = pg.getSize();
+                const fb = await apDoc.embedFont(StandardFonts.HelveticaBold);
+                const limpa = razao.replace(/[^\x20-\x7EÀ-ÿ]/g,"");
+                let sz = 22, maxW = width - 90, tw = fb.widthOfTextAtSize(limpa, sz);
+                while(tw > maxW && sz > 9){ sz -= 1; tw = fb.widthOfTextAtSize(limpa, sz); }
+                pg.drawText(limpa, { x:(width - tw)/2, y: height*0.485, size:sz, font:fb, color: rgb(1,1,1) });
+              }
+            }catch(_){}
+            (await out.copyPages(apDoc, apDoc.getPageIndices())).forEach(p=>out.addPage(p));
+          }catch(err){ avisos.push("apresentação não pôde ser anexada"); }
+        } else { avisos.push("apresentação não é PDF (não embutível)"); }
+      } else { avisos.push("nenhuma apresentação cadastrada para o consultor"); }
+      // 2o Proposta Comercial + Planilhas (todo o print-area)
+      const plDoc = await PDFDocument.load(planilhaBytes, { ignoreEncryption:true });
+      (await out.copyPages(plDoc, plDoc.getPageIndices())).forEach(p=>out.addPage(p));
       // 3o CND's de todos os segmentos da proposta — normalizadas para A4 retrato
+      setPdfMsg("Anexando CND's…");
+      const A4=[595.28, 841.89];
       let cndOk=0;
-      if(incluirApres){
-        setPdfMsg("Anexando CND's…");
-        for(const grupo of gruposCND){
-          const cnds = await carregarCNDs(grupo);
-          for(const cnd of cnds){ try{
-            const srcDoc = await PDFDocument.load(dataURLparaBytes(cnd.data), { ignoreEncryption:true });
-            const limpo = await srcDoc.save();
-            const nn = srcDoc.getPageCount();
-            const embeds = await out.embedPdf(limpo, Array.from({length:nn},(_,k)=>k));
-            for(const emb of embeds){
-              const s = Math.min(A4[0]/emb.width, A4[1]/emb.height);
-              const w=emb.width*s, h=emb.height*s;
-              const page = out.addPage(A4);
-              page.drawPage(emb, { x:(A4[0]-w)/2, y:(A4[1]-h)/2, width:w, height:h });
-            }
-            cndOk++;
-          }catch(err){ avisos.push(`CND ${cnd.nome} (${CND_GRUPOS[grupo]}) não pôde ser anexada`); } }
-        }
+      for(const grupo of gruposCND){
+        const cnds = await carregarCNDs(grupo);
+        for(const cnd of cnds){ try{
+          const srcDoc = await PDFDocument.load(dataURLparaBytes(cnd.data), { ignoreEncryption:true });
+          const limpo = await srcDoc.save();
+          const nn = srcDoc.getPageCount();
+          const embeds = await out.embedPdf(limpo, Array.from({length:nn},(_,k)=>k));
+          for(const emb of embeds){
+            const scale = Math.min(A4[0]/emb.width, A4[1]/emb.height);
+            const w=emb.width*scale, h=emb.height*scale;
+            const page = out.addPage(A4);
+            page.drawPage(emb, { x:(A4[0]-w)/2, y:(A4[1]-h)/2, width:w, height:h });
+          }
+          cndOk++;
+        }catch(err){ avisos.push(`CND ${cnd.nome} (${CND_GRUPOS[grupo]}) não pôde ser anexada`); } }
       }
-
       const blob = new Blob([await out.save()], {type:"application/pdf"});
       const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=nome+".pdf"; document.body.appendChild(a); a.click(); a.remove();
-      setPdfMsg(`PDF salvo${incluirApres?` (apresentação + planilhas${cndOk?` + ${cndOk} CND's (${nomesGrupos})`:""})`:" nos downloads"}.${avisos.length?" Obs.: "+avisos.join("; ")+".":""}`);
-      setTimeout(()=>setPdfMsg(""),9000); setPdfBusy(false); return;
+      setPdfMsg(`PDF completo salvo (proposta + planilhas${cndOk?` + ${cndOk} CND's (${nomesGrupos})`:""}).${avisos.length?" Obs.: "+avisos.join("; ")+".":""}`); setTimeout(()=>setPdfMsg(""),9000); setPdfBusy(false); return;
     }catch(e){ /* segue para o caminho garantido */ }
 
     // 2) Caminho garantido: baixa um HTML que abre a impressão sozinho (Salvar como PDF)
@@ -2024,9 +2014,16 @@ function PlanilhaCusto({it, prop, totalProf}){
   const SEC=(t)=> <tr><td colSpan={4} className="px-2 py-1 font-bold text-white border border-slate-300" style={{backgroundColor:C.navy}}>{t}</td></tr>;
   const SUB=(t)=> <tr><td colSpan={4} className="px-2 py-[2px] font-semibold text-slate-600 border border-slate-200 bg-slate-100">{t}</td></tr>;
 
+  // Densidade do cargo: SÓ os cargos com mais rubricas de salário recebem fonte um pouco menor,
+  // o suficiente para caber em 1 página. Cargos que já cabem ficam exatamente como estão (densCls="").
+  const _rem=[c.salarioBase,c.insalub,c.pericul,c.adNot,c.horaNot,c.dsr,c.grat,c.intraj,c.assid].filter(v=>Number(v)).length;
+  const _enc=((c.encA&&c.encA.length)||0)+((c.encB&&c.encB.length)||0)+((c.encC&&c.encC.length)||0);
+  const _nLin = 22 + _rem + _enc; // linhas estimadas da folha 1 (mão de obra + remuneração + encargos)
+  const densCls = _nLin<=44 ? "" : _nLin<=48 ? " fz-92" : _nLin<=54 ? " fz-85" : " fz-78";
+
   return <div className="posto text-[10px]">
     {/* ===== FOLHA 1: título → Mão de Obra → I-Remuneração → II-Encargos (78,5%) ===== */}
-    <div className="folha p-6">
+    <div className={"folha p-6"+densCls}>
       <div className="text-center font-bold text-slate-800 text-sm mb-3 mt-1">PLANILHA DE CUSTOS POR POSTO DE TRABALHO</div>
       <div className="quadro mb-1">
         <table className="w-full">
@@ -2087,7 +2084,7 @@ function PlanilhaCusto({it, prop, totalProf}){
     </div>
 
     {/* ===== FOLHA 2: Quadro III → IV → V → VI → Resultado ===== */}
-    <div className="folha p-6">
+    <div className={"folha p-6"+densCls}>
       <div className="text-center font-semibold text-slate-500 text-[11px] mb-3">{it.tab} — {CIDADE_REG[regiao]} · composição (continuação)</div>
       <div className="quadro mb-1">
         <table className="w-full border-collapse table-fixed">
@@ -2154,7 +2151,7 @@ function PlanilhaCusto({it, prop, totalProf}){
     </div>
 
     {/* ===== FOLHA 3: Quadro VII → VIII → IX → assinatura ===== */}
-    <div className="folha p-6">
+    <div className={"folha p-6"+densCls}>
       <div className="text-center font-semibold text-slate-500 text-[11px] mb-3">{it.tab} — {CIDADE_REG[regiao]} · demonstrativos</div>
       <div className="quadro mb-1">
         <table className="w-full border-collapse table-fixed">
