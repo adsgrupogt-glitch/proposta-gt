@@ -609,6 +609,12 @@ function App(){
           .quadro { break-inside: avoid; page-break-inside: avoid; }
           @page { size: A4; margin: 10mm; }
         }
+        /* Compactação automática por folha (aplicada só quando a folha não cabe em 1 página) */
+        .folha.fz-92 td,.folha.fz-92 th{font-size:9.2px!important;padding-top:1px!important;padding-bottom:1px!important;line-height:1.18!important}
+        .folha.fz-85 td,.folha.fz-85 th{font-size:8.5px!important;padding-top:0!important;padding-bottom:0!important;line-height:1.12!important}
+        .folha.fz-78 td,.folha.fz-78 th{font-size:7.8px!important;padding-top:0!important;padding-bottom:0!important;line-height:1.08!important}
+        .folha.fz-72 td,.folha.fz-72 th{font-size:7.2px!important;padding-top:0!important;padding-bottom:0!important;line-height:1.04!important}
+        .folha.fz-85,.folha.fz-78,.folha.fz-72{padding:14px!important}
       `}</style>
       {/* Sidebar */}
       <aside className="w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col">
@@ -1783,6 +1789,11 @@ function baixarHTMLImprimivel(innerHTML, titulo){
   body { background:#fff; color:#0f172a; font-family: ui-sans-serif, system-ui, Arial, sans-serif; }
   .folha { page-break-before: always; }
   .folha:first-child { page-break-before: auto; }
+  .folha.fz-92 td,.folha.fz-92 th{font-size:9.2px!important;padding-top:1px!important;padding-bottom:1px!important;line-height:1.18!important}
+  .folha.fz-85 td,.folha.fz-85 th{font-size:8.5px!important;padding-top:0!important;padding-bottom:0!important;line-height:1.12!important}
+  .folha.fz-78 td,.folha.fz-78 th{font-size:7.8px!important;padding-top:0!important;padding-bottom:0!important;line-height:1.08!important}
+  .folha.fz-72 td,.folha.fz-72 th{font-size:7.2px!important;padding-top:0!important;padding-bottom:0!important;line-height:1.04!important}
+  .folha.fz-85,.folha.fz-78,.folha.fz-72{padding:14px!important}
   .quadro { break-inside: avoid; page-break-inside: avoid; }
   table { width: 100%; border-collapse: collapse; }
   .no-print { display:none !important; }
@@ -1821,6 +1832,25 @@ function PropView({prop, empresas, onVoltar, onStatus, onEditar, onExcluir, onSo
   const gerarPDF=async(incluirApres)=>{
     setPdfBusy(true); setPdfMsg("Gerando documento…");
     const el=document.getElementById("prop-print-area");
+    // Compacta automaticamente cada folha que não couber em 1 página A4 (cargos com mais rubricas de salário)
+    const restaurarFolhas = (()=>{
+      const niveis=["fz-92","fz-85","fz-78","fz-72"]; const tocadas=[];
+      try{
+        const wEl = el.offsetWidth || 760;
+        const maxH = wEl * (276/194); // altura útil de 1 pág A4 (margens 8/8/10/8mm) com folga de segurança
+        el.querySelectorAll(".folha").forEach(f=>{
+          niveis.forEach(n=>f.classList.remove(n));
+          let i=0;
+          while(f.offsetHeight > maxH && i < niveis.length){
+            if(i>0) f.classList.remove(niveis[i-1]);
+            f.classList.add(niveis[i]); i++;
+          }
+          if(i>0) tocadas.push(f);
+        });
+      }catch(_){}
+      return ()=>{ try{ tocadas.forEach(f=>niveis.forEach(n=>f.classList.remove(n))); }catch(_){} };
+    })();
+    try{
     const nome=`${prop.numero} - ${prop.razaoSocial}`;
     const gruposCND = (prop.cndGrupos && prop.cndGrupos.length) ? [...new Set(prop.cndGrupos)] : [prop.cndVinculo || prop.segmento || "asseio"];
     const grupoCND = gruposCND[0];
@@ -1913,6 +1943,7 @@ function PropView({prop, empresas, onVoltar, onStatus, onEditar, onExcluir, onSo
       setPdfMsg("Não foi possível gerar o arquivo neste ambiente. Tente novamente ou use Ctrl+P (Cmd+P no Mac).");
     }
     setPdfBusy(false);
+    } finally { restaurarFolhas(); }
   };
 
   return <div>
