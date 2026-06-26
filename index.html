@@ -1835,8 +1835,8 @@ function PropView({prop, empresas, onVoltar, onStatus, onEditar, onExcluir, onSo
     const nome=`${prop.numero} - ${prop.razaoSocial}`;
     const gruposCND = (prop.cndGrupos && prop.cndGrupos.length) ? [...new Set(prop.cndGrupos)] : [prop.cndVinculo || prop.segmento || "asseio"];
     const nomesGrupos = gruposCND.map(g=>CND_GRUPOS[g]).join(" + ");
-    // 1) Caminho ideal: PDF real via html2pdf (mantém a Proposta Comercial + planilhas em tamanho legível).
-    //    Os cargos com mais rubricas já vêm com a fonte ajustada (densCls) para caber em 1 página por folha.
+    // 1) Caminho ideal: PDF real via html2pdf (Apresentação + Proposta Comercial + Planilhas + CND's),
+    //    tudo no tamanho padrão. As 3 páginas por cargo fecham porque o quadro "Mão de Obra" foi enxugado.
     try{
       await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
       if(!window.html2pdf) throw new Error("html2pdf indisponível");
@@ -2014,28 +2014,17 @@ function PlanilhaCusto({it, prop, totalProf}){
   const SEC=(t)=> <tr><td colSpan={4} className="px-2 py-1 font-bold text-white border border-slate-300" style={{backgroundColor:C.navy}}>{t}</td></tr>;
   const SUB=(t)=> <tr><td colSpan={4} className="px-2 py-[2px] font-semibold text-slate-600 border border-slate-200 bg-slate-100">{t}</td></tr>;
 
-  // Densidade do cargo: SÓ os cargos com mais rubricas de salário recebem fonte um pouco menor,
-  // o suficiente para caber em 1 página. Cargos que já cabem ficam exatamente como estão (densCls="").
-  const _rem=[c.salarioBase,c.insalub,c.pericul,c.adNot,c.horaNot,c.dsr,c.grat,c.intraj,c.assid].filter(v=>Number(v)).length;
-  const _enc=((c.encA&&c.encA.length)||0)+((c.encB&&c.encB.length)||0)+((c.encC&&c.encC.length)||0);
-  const _nLin = 22 + _rem + _enc; // linhas estimadas da folha 1 (mão de obra + remuneração + encargos)
-  const densCls = _nLin<=44 ? "" : _nLin<=48 ? " fz-92" : _nLin<=54 ? " fz-85" : " fz-78";
-
   return <div className="posto text-[10px]">
     {/* ===== FOLHA 1: título → Mão de Obra → I-Remuneração → II-Encargos (78,5%) ===== */}
-    <div className={"folha p-6"+densCls}>
+    <div className="folha p-6">
       <div className="text-center font-bold text-slate-800 text-sm mb-3 mt-1">PLANILHA DE CUSTOS POR POSTO DE TRABALHO</div>
       <div className="quadro mb-1">
         <table className="w-full">
           <tbody>
             {SUB("Mão de Obra Vinculada à Execução Contratual")}
             <tr><td className="px-2 py-[2px] border border-slate-200 w-6 text-center font-semibold">A</td><td className="px-2 py-[2px] border border-slate-200">Tipo de Serviço</td><td className="px-2 py-[2px] border border-slate-200 text-right w-48">{it.tab}</td></tr>
-            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">B</td><td className="px-2 py-[2px] border border-slate-200">Local de Prestação dos Serviços</td><td className="px-2 py-[2px] border border-slate-200 text-right">{REG_TAB[regiao]||regiao}</td></tr>
-            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">C</td><td className="px-2 py-[2px] border border-slate-200">Salário Normativo da Categoria</td><td className="px-2 py-[2px] border border-slate-200 text-right">{BRL(c.normativo)}</td></tr>
-            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">D</td><td className="px-2 py-[2px] border border-slate-200">Categoria Profissional</td><td className="px-2 py-[2px] border border-slate-200 text-right">{CATEGORIA(it.tab)}</td></tr>
-            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">E</td><td className="px-2 py-[2px] border border-slate-200">Quantidade (total) de postos a contratar</td><td className="px-2 py-[2px] border border-slate-200 text-right">{qtd}</td></tr>
-            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">F</td><td className="px-2 py-[2px] border border-slate-200">N° de meses de execução contratual</td><td className="px-2 py-[2px] border border-slate-200 text-right">{prop.meses}</td></tr>
-            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">G</td><td className="px-2 py-[2px] border border-slate-200">Data de apresentação da proposta</td><td className="px-2 py-[2px] border border-slate-200 text-right">{prop.criadoEm?.split("-").reverse().join("/")}</td></tr>
+            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">B</td><td className="px-2 py-[2px] border border-slate-200">Salário Normativo da Categoria</td><td className="px-2 py-[2px] border border-slate-200 text-right">{BRL(c.normativo)}</td></tr>
+            <tr><td className="px-2 py-[2px] border border-slate-200 text-center font-semibold">C</td><td className="px-2 py-[2px] border border-slate-200">Quantidade (total) de postos</td><td className="px-2 py-[2px] border border-slate-200 text-right">{qtd}</td></tr>
           </tbody>
         </table>
       </div>
@@ -2084,7 +2073,7 @@ function PlanilhaCusto({it, prop, totalProf}){
     </div>
 
     {/* ===== FOLHA 2: Quadro III → IV → V → VI → Resultado ===== */}
-    <div className={"folha p-6"+densCls}>
+    <div className="folha p-6">
       <div className="text-center font-semibold text-slate-500 text-[11px] mb-3">{it.tab} — {CIDADE_REG[regiao]} · composição (continuação)</div>
       <div className="quadro mb-1">
         <table className="w-full border-collapse table-fixed">
@@ -2151,7 +2140,7 @@ function PlanilhaCusto({it, prop, totalProf}){
     </div>
 
     {/* ===== FOLHA 3: Quadro VII → VIII → IX → assinatura ===== */}
-    <div className={"folha p-6"+densCls}>
+    <div className="folha p-6">
       <div className="text-center font-semibold text-slate-500 text-[11px] mb-3">{it.tab} — {CIDADE_REG[regiao]} · demonstrativos</div>
       <div className="quadro mb-1">
         <table className="w-full border-collapse table-fixed">
