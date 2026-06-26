@@ -719,8 +719,8 @@ function StepFlow({steps}){
 /* ===================== DASHBOARD ===================== */
 function Dashboard({me, isAdmin, props, oss=[], contratos=[], saveProps, users}){
   const [scope,setScope]=useState(isAdmin?"all":"me");
-  const [periodo,setPeriodo]=useState("12m"); // 12m | ano | tudo
-  const [tipo,setTipo]=useState("todas");     // todas | normais | extras
+  const [periodo,setPeriodo]=useState(isAdmin?"ano":"12m"); // admin abre em 2026 (ano atual); demais em 12m
+  const [tipo,setTipo]=useState(isAdmin?"normais":"todas");  // admin abre em Normais; demais em Todas
   const anoAtual=new Date().getFullYear();
   const inPeriodo=(d)=>{ if(periodo==="tudo") return true; if(periodo==="ano") return String(d||"").slice(0,4)===String(anoAtual);
     const lim=new Date(); lim.setMonth(lim.getMonth()-11); lim.setDate(1); return new Date(String(d||"1970-01-01").slice(0,10)+"T00:00:00")>=lim; };
